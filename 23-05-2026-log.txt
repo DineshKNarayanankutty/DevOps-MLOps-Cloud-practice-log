@@ -1,0 +1,63 @@
+Yesterday - 22/5/2026
+
+| Scenario                          | Commands / Code                                                                     | Purpose                                |
+| --------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------- |
+| Create Python Virtual Environment | `mkdir -p /root/code`                                                               | Create working directory               |
+|                                   | `python3 -m venv /root/code/ml-env`                                                 | Create virtual environment             |
+|                                   | `source /root/code/ml-env/bin/activate`                                             | Activate virtual environment           |
+| Install ML Libraries              | `pip install numpy pandas scikit-learn matplotlib`                                  | Install ML packages                    |
+| Generate requirements.txt         | `pip freeze > /root/code/requirements.txt`                                          | Export installed dependencies          |
+| Verify requirements               | `cat /root/code/requirements.txt`                                                   | Validate installed packages            |
+| Create Non-Interactive User       | `ssh steve@stapp02`                                                                 | Connect to App Server 2                |
+|                                   | `sudo su -`                                                                         | Switch to root                         |
+|                                   | `useradd -s /sbin/nologin jim`                                                      | Create secure non-login user           |
+| Verify User Shell                 | `grep jim /etc/passwd`                                                              | Verify non-interactive shell           |
+| Create Temporary User             | `ssh banner@stapp03`                                                                | Connect to App Server 3                |
+|                                   | `sudo su -`                                                                         | Become root                            |
+|                                   | `useradd -e 2027-02-17 mariyam`                                                     | Create user with expiry date           |
+| Verify Expiry                     | `chage -l mariyam`                                                                  | Check account expiration               |
+| JupyterLab Troubleshooting        | `mkdir -p /root/notebooks`                                                          | Create notebook root directory         |
+|                                   | `source /root/code/ml-env/bin/activate`                                             | Activate Python environment            |
+|                                   | `jupyter lab --config=/root/code/jupyter_lab_config.py --allow-root --no-browser &` | Start JupyterLab                       |
+| Verify JupyterLab                 | `ss -tulnp \| grep 8888`                                                            | Confirm service listening on port 8888 |
+| Jupyter Config Validation         | `c.ServerApp.port = 8888`                                                           | Ensure correct port                    |
+|                                   | `c.ServerApp.ip = '0.0.0.0'`                                                        | Allow external access                  |
+|                                   | `c.ServerApp.notebook_dir = '/root/notebooks'`                                      | Set notebook directory                 |
+
+Today - 23/5/2026
+
+| Scenario                       | Commands / Code                                                                                                                                                          | Purpose                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| Terraform Key Pair Setup       | `cd /home/bob/terraform`                                                                                                                                                 | Navigate to Terraform workspace |
+| Terraform Init                 | `terraform init`                                                                                                                                                         | Initialize Terraform            |
+| Terraform Apply                | `terraform apply -auto-approve`                                                                                                                                          | Provision infrastructure        |
+| Verify PEM File                | `ls -l /home/bob/datacenter-kp.pem`                                                                                                                                      | Confirm private key creation    |
+| Terraform RSA Key Resource     | `hcl resource "tls_private_key" "datacenter_kp" { algorithm = "RSA" rsa_bits = 4096 } `                                                                                  | Generate RSA private key        |
+| AWS Key Pair Resource          | `hcl resource "aws_key_pair" "datacenter_kp" { key_name = "datacenter-kp" public_key = tls_private_key.datacenter_kp.public_key_openssh } `                              | Create AWS key pair             |
+| Store PEM File                 | `hcl resource "local_file" "private_key" { filename = "/home/bob/datacenter-kp.pem" content = tls_private_key.datacenter_kp.private_key_pem file_permission = "0600" } ` | Save PEM locally                |
+| Terraform Security Group Setup | `terraform init`                                                                                                                                                         | Initialize Terraform            |
+|                                | `terraform apply -auto-approve`                                                                                                                                          | Create security group           |
+| Verify Security Group          | `terraform state list`                                                                                                                                                   | Validate Terraform resources    |
+| Default VPC Lookup             | `hcl data "aws_vpc" "default" { default = true } `                                                                                                                       | Retrieve default VPC            |
+| Security Group Creation        | `hcl resource "aws_security_group" "nautilus_sg" { name = "nautilus-sg" description = "Security group for Nautilus App Servers" vpc_id = data.aws_vpc.default.id } `     | Create SG in default VPC        |
+| HTTP Ingress Rule              | `hcl ingress { from_port = 80 to_port = 80 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } `                                                                              | Allow HTTP traffic              |
+| SSH Ingress Rule               | `hcl ingress { from_port = 22 to_port = 22 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } `                                                                              | Allow SSH access                |
+| Azure VM Public IP Check       | `az vm list-ip-addresses --name xfusion-vm --output table`                                                                                                               | Retrieve VM public IP           |
+| SSH to Azure VM                | `ssh azureuser@<public-ip>`                                                                                                                                              | Connect to VM                   |
+| SSH Key Authentication         | `chmod 400 mykey.pem`                                                                                                                                                    | Secure PEM permissions          |
+|                                | `ssh -i mykey.pem azureuser@<public-ip>`                                                                                                                                 | Login using private key         |
+| Verify VM Authentication       | `az vm show -g <resource-group> -n xfusion-vm --query osProfile.linuxConfiguration`                                                                                      | Check SSH/password auth config  |
+
+
+Skills Practiced
+
+| Area                          | Topics                                            |
+| ----------------------------- | ------------------------------------------------- |
+| Linux Administration          | User management, account expiry, secure shells    |
+| Python Environment Management | Virtual environments, package management          |
+| JupyterLab Administration     | Configuration validation, service troubleshooting |
+| Terraform                     | Infrastructure as Code, AWS provisioning          |
+| AWS                           | Security groups, key pairs, VPC usage             |
+| Azure                         | VM provisioning, SSH access                       |
+| Networking                    | Port exposure, inbound rules                      |
+| DevOps                        | Troubleshooting, automation, infrastructure setup |
