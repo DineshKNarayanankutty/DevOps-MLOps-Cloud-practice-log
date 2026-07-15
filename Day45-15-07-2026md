@@ -1,0 +1,1286 @@
+# Today's Log  — 15/07/2026 - Day45
+
+Today's activities focused on strengthening cloud infrastructure, containerization, Kubernetes administration, Linux operations, and secure DevOps practices through hands-on work with AWS NAT Gateway, Azure Kubernetes Service (AKS), HashiCorp Vault AppRole authentication, Docker, and Kubernetes resource management, emphasizing production-ready networking, automation, troubleshooting, and secure secrets management.
+
+---
+
+# AWS
+
+# Enabling Internet Access for a Private EC2 Instance Using NAT Gateway
+
+## Objective
+
+Configure outbound Internet access for an EC2 instance running in a private subnet without exposing it to inbound Internet traffic. The EC2 instance was already configured with a cron job that uploads a test file to an S3 bucket once Internet connectivity becomes available.
+
+---
+
+## Existing Resources
+
+```text
+VPC:
+nautilus-priv-vpc
+
+Private Subnet:
+nautilus-priv-subnet
+
+Private EC2:
+nautilus-priv-ec2
+
+S3 Bucket:
+nautilus-nat-139335375
+```
+
+---
+
+## Resources Created
+
+```text
+Public Subnet:
+nautilus-pub-subnet
+
+Internet Gateway:
+nautilus-igw
+
+Public Route Table:
+nautilus-pub-rt
+
+Elastic IP:
+Allocated
+
+NAT Gateway:
+nautilus-natgw
+```
+
+---
+
+## Step-by-Step Implementation
+
+### 1. Created Public Subnet
+
+Created a new subnet inside the existing VPC.
+
+```text
+Name:
+nautilus-pub-subnet
+
+VPC:
+nautilus-priv-vpc
+
+Availability Zone:
+Same AZ as private subnet
+
+CIDR:
+Unused subnet within VPC CIDR
+```
+
+Enabled:
+
+```text
+Auto Assign Public IPv4 Address
+```
+
+---
+
+### 2. Created Internet Gateway
+
+Created:
+
+```text
+nautilus-igw
+```
+
+Attached it to:
+
+```text
+nautilus-priv-vpc
+```
+
+---
+
+### 3. Created Public Route Table
+
+Created:
+
+```text
+nautilus-pub-rt
+```
+
+Associated it with:
+
+```text
+nautilus-pub-subnet
+```
+
+Added route:
+
+```text
+Destination:
+0.0.0.0/0
+
+Target:
+Internet Gateway
+```
+
+---
+
+### 4. Allocated Elastic IP
+
+Allocated a public Elastic IP which was later attached to the NAT Gateway.
+
+---
+
+### 5. Created NAT Gateway
+
+Configuration:
+
+```text
+Name:
+nautilus-natgw
+
+Subnet:
+nautilus-pub-subnet
+
+Elastic IP:
+Allocated EIP
+
+Connectivity:
+Public
+```
+
+Waited until the NAT Gateway state became:
+
+```text
+Available
+```
+
+---
+
+### 6. Updated Private Route Table
+
+Located the route table associated with:
+
+```text
+nautilus-priv-subnet
+```
+
+Added route:
+
+```text
+Destination:
+0.0.0.0/0
+
+Target:
+nautilus-natgw
+```
+
+This redirected all outbound traffic from the private subnet through the NAT Gateway.
+
+---
+
+### 7. Verification
+
+Waited approximately:
+
+```text
+2–3 minutes
+```
+
+The existing cron job on the EC2 instance automatically uploaded the test file.
+
+Verified in S3:
+
+```text
+Bucket:
+nautilus-nat-139335375
+
+↓
+
+Test file successfully uploaded
+```
+
+---
+
+## Architecture
+
+```text
+                    Internet
+                        │
+                        ▼
+                Internet Gateway
+                        │
+             Public Route Table
+                        │
+                        ▼
+                Public Subnet
+                        │
+                        ▼
+                 NAT Gateway
+                  (Elastic IP)
+                        │
+                        ▼
+            Private Route Table
+                        │
+                        ▼
+             Private EC2 Instance
+                        │
+                        ▼
+                Upload Test File
+                        │
+                        ▼
+                    Amazon S3
+```
+
+---
+
+## Why NAT Gateway?
+
+A private EC2 instance should **not** receive inbound Internet traffic, but it often needs outbound access for:
+
+* Downloading OS updates
+* Installing packages
+* Uploading logs
+* Uploading backups
+* Accessing AWS services like S3
+
+The NAT Gateway provides **outbound-only** Internet access.
+
+Traffic flow:
+
+```text
+EC2
+
+↓
+
+NAT Gateway
+
+↓
+
+Internet
+
+↓
+
+S3
+```
+
+No unsolicited inbound connections can reach the private EC2.
+
+---
+
+## Key Learning
+
+A NAT Gateway is the standard AWS design for allowing private subnet resources to access the Internet securely without assigning public IP addresses.
+
+---
+
+# Azure
+
+# Private Azure Kubernetes Service (AKS) Cluster Deployment
+
+## Objective
+
+Provision a private AKS cluster with autoscaling enabled, Kubernetes version 1.33.0, and monitoring disabled to create a secure production-style Kubernetes environment.
+
+---
+
+## Cluster Configuration
+
+```text
+Cluster Name:
+devops-aks
+
+Region:
+Central US
+
+Kubernetes Version:
+1.33.0
+```
+
+---
+
+## Node Pool Configuration
+
+Configured the system node pool:
+
+```text
+VM Size:
+Standard_D2s_v3
+
+Autoscaling:
+Enabled
+
+Minimum Nodes:
+1
+
+Maximum Nodes:
+2
+```
+
+Removed any additional node pools if present, leaving only the required system node pool.
+
+---
+
+## Networking
+
+Configured:
+
+```text
+Private Cluster:
+Enabled
+```
+
+This ensured that the Kubernetes API server is accessible only from within the Azure virtual network (or connected private networks).
+
+---
+
+## Monitoring
+
+Disabled:
+
+```text
+Container Insights
+
+Azure Monitor
+
+Managed Prometheus
+
+Other monitoring integrations
+```
+
+---
+
+## Verification
+
+Verified:
+
+```text
+Cluster:
+Running
+
+Private Endpoint:
+Enabled
+
+Node Pool:
+Standard_D2s_v3
+
+Autoscaling:
+1–2 Nodes
+
+Monitoring:
+Disabled
+```
+
+---
+
+## Architecture
+
+```text
+                 Azure
+                   │
+                   ▼
+            AKS Control Plane
+          (Managed by Azure)
+                   │
+          Private API Endpoint
+                   │
+                   ▼
+          System Node Pool
+      Standard_D2s_v3
+      Min 1  Max 2
+                   │
+                   ▼
+             Kubernetes Pods
+```
+
+---
+
+## Important Concept Learned
+
+One important discussion today was understanding **Azure-managed control planes**.
+
+Although Microsoft manages:
+
+* Kubernetes API Server
+* Scheduler
+* Controller Manager
+* etcd
+* High Availability
+
+the customer still controls:
+
+* Public vs Private API access
+* Network exposure
+* Authentication
+* RBAC permissions
+
+Azure manages **how the control plane runs**, while the customer controls **who can reach it**.
+
+---
+
+## Public vs Private Cluster
+
+### Public
+
+```text
+Internet
+
+↓
+
+AKS API Endpoint
+
+↓
+
+Authentication
+
+↓
+
+Cluster
+```
+
+---
+
+### Private
+
+```text
+Internet
+
+X
+
+(No Access)
+
+Azure VNet
+
+↓
+
+Private AKS API
+
+↓
+
+Cluster
+```
+
+---
+
+## Key Learning
+
+"Managed by Azure" and "Private Cluster" are different concepts.
+
+Azure operates the Kubernetes control plane, but customers decide whether its API endpoint is publicly reachable or only accessible within private networks.
+
+---
+
+# MLOps
+
+# HashiCorp Vault AppRole Authentication for MLflow
+
+## Objective
+
+Replace static authentication with machine-based authentication using **AppRole** and grant least-privilege access to MLflow through a Vault policy.
+
+---
+
+## Initial Problem
+
+The MLflow wrapper could not start because:
+
+* AppRole authentication was not enabled.
+* The existing Vault policy granted incorrect permissions.
+
+Existing policy:
+
+```hcl
+path "secret/mlflow" {
+  capabilities = ["create", "update"]
+}
+```
+
+Problems:
+
+* Wrong path.
+* Wrong capabilities.
+
+---
+
+## Corrected Policy
+
+Created:
+
+```hcl
+path "secret/data/mlflow" {
+  capabilities = ["read"]
+}
+```
+
+This aligns with Vault KV v2 API paths.
+
+---
+
+## Authentication Method
+
+Enabled:
+
+```text
+AppRole Authentication
+```
+
+---
+
+## Created Role
+
+Created AppRole:
+
+```text
+Role:
+mlflow
+
+Policy:
+mlflow-reader
+```
+
+---
+
+## Authentication Flow
+
+```text
+MLflow Wrapper
+
+↓
+
+AppRole Login
+
+↓
+
+Vault
+
+↓
+
+Temporary Token
+
+↓
+
+Read secret/data/mlflow
+
+↓
+
+Retrieve admin_password
+
+↓
+
+Start MLflow
+```
+
+---
+
+## Issue Encountered
+
+Initially:
+
+```bash
+vault login
+```
+
+failed with:
+
+```text
+HTTP response to HTTPS client
+```
+
+Root cause:
+
+The Vault CLI attempted:
+
+```text
+https://127.0.0.1:8200
+```
+
+while the lab Vault server was running on:
+
+```text
+http://127.0.0.1:8200
+```
+
+Resolved by:
+
+```bash
+export VAULT_ADDR=http://127.0.0.1:8200
+```
+
+---
+
+## Commands Used
+
+```bash
+# Configure Vault endpoint
+export VAULT_ADDR=http://127.0.0.1:8200
+
+# Login
+vault login $(cat /root/code/vault-root-token)
+
+# Read existing policy
+vault policy read mlflow-reader
+
+# Create corrected policy
+vi /tmp/mlflow-reader.hcl
+
+# Upload policy
+vault policy write mlflow-reader /tmp/mlflow-reader.hcl
+
+# Verify policy
+vault policy read mlflow-reader
+
+# List auth methods
+vault auth list
+
+# Enable AppRole
+vault auth enable approle
+
+# Create AppRole
+vault write auth/approle/role/mlflow \
+token_policies="mlflow-reader"
+
+# Verify AppRole
+vault read auth/approle/role/mlflow
+
+# Watch wrapper logs
+tail -f /var/log/mlflow-wrapper.log
+
+# Verify MLflow
+curl -I http://localhost:5000
+```
+
+---
+
+## Production Concept Learned
+
+Today's Vault task demonstrated how production services authenticate securely.
+
+Instead of embedding a root token inside an application:
+
+```text
+Application
+
+↓
+
+Root Token
+
+↓
+
+Vault
+```
+
+(which is insecure),
+
+modern applications authenticate using:
+
+```text
+Application
+
+↓
+
+AppRole Login
+
+↓
+
+Short-lived Token
+
+↓
+
+Vault
+
+↓
+
+Retrieve Secrets
+```
+
+Benefits:
+
+* No hardcoded credentials.
+* Temporary tokens.
+* Least-privilege access through policies.
+* Easier credential rotation.
+* Reduced blast radius if a credential is compromised.
+
+---
+
+# Kubernetes
+
+# ReplicaSet Creation and Troubleshooting
+
+## Objective
+
+Create a ReplicaSet named **nginx-replicaset** with:
+
+* Image: `nginx:latest`
+* Replicas: **4**
+* Container Name: `nginx-container`
+* Labels:
+
+  * `app=nginx_app`
+  * `type=front-end`
+
+---
+
+## ReplicaSet Manifest
+
+Created the following YAML:
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-replicaset
+  labels:
+    app: nginx_app
+    type: front-end
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: nginx_app
+      type: front-end
+  template:
+    metadata:
+      labels:
+        app: nginx_app
+        type: front-end
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+```
+
+---
+
+## Applied the Manifest
+
+```bash
+kubectl apply -f nginx-replicaset.yaml
+```
+
+---
+
+## Verification Commands
+
+ReplicaSet:
+
+```bash
+kubectl get rs
+```
+
+Pods:
+
+```bash
+kubectl get pods --show-labels
+```
+
+ReplicaSet details:
+
+```bash
+kubectl describe rs nginx-replicaset
+```
+
+---
+
+## Issue Encountered
+
+Although the Pods were created correctly:
+
+```text
+app=nginx_app
+type=front-end
+```
+
+the lab validator failed with:
+
+```text
+Labels 'app' is not set to 'nginx_app'
+Labels 'type' is not set to 'front-end'
+```
+
+---
+
+## Root Cause
+
+The labels were present only on the Pod template.
+
+The validator also expected labels on the ReplicaSet object's metadata.
+
+Added:
+
+```yaml
+metadata:
+  labels:
+    app: nginx_app
+    type: front-end
+```
+
+which resolved the validation issue.
+
+---
+
+## Kubernetes Label Hierarchy Learned
+
+A ReplicaSet contains labels in three different locations:
+
+```text
+ReplicaSet Metadata Labels
+        │
+        ▼
+Selector Match Labels
+        │
+        ▼
+Pod Template Labels
+```
+
+Understanding the purpose of each:
+
+| Location                 | Purpose                                         |
+| ------------------------ | ----------------------------------------------- |
+| metadata.labels          | Labels attached to the ReplicaSet object itself |
+| selector.matchLabels     | Determines which Pods the ReplicaSet manages    |
+| template.metadata.labels | Labels assigned to newly created Pods           |
+
+---
+
+## Key Learning
+
+Many Kubernetes validators verify all three label locations even when the task wording only mentions applying labels. Keeping metadata labels and Pod template labels aligned avoids validation failures.
+
+---
+
+# DevOps
+
+# Dockerfile Debugging
+
+## Objective
+
+Fix an existing Dockerfile without changing the base image or application data so that the image builds successfully.
+
+---
+
+## Initial Dockerfile Issues
+
+The Dockerfile contained:
+
+```dockerfile
+COPY /server.crt ...
+COPY /server.key ...
+COPY ./index.html ...
+```
+
+Build failed with:
+
+```text
+failed to calculate checksum
+
+"/index.html" not found
+```
+
+---
+
+## Investigation
+
+Checked the Docker build context:
+
+```bash
+cd /opt/docker
+
+ls -l
+```
+
+Output:
+
+```text
+Dockerfile
+certs/
+html/
+```
+
+The actual files were located in:
+
+```text
+/opt/docker/certs/server.crt
+/opt/docker/certs/server.key
+/opt/docker/html/index.html
+```
+
+---
+
+## Corrected COPY Statements
+
+```dockerfile
+COPY certs/server.crt /usr/local/apache2/conf/server.crt
+
+COPY certs/server.key /usr/local/apache2/conf/server.key
+
+COPY html/index.html /usr/local/apache2/htdocs/index.html
+```
+
+---
+
+## Build Command
+
+```bash
+docker build -t httpd-image .
+```
+
+---
+
+## Important Docker Concept Learned
+
+Docker builds use a **build context**.
+
+The build context was:
+
+```text
+/opt/docker
+```
+
+Docker can only access files inside this directory.
+
+Incorrect:
+
+```dockerfile
+COPY /server.crt ...
+```
+
+Correct:
+
+```dockerfile
+COPY certs/server.crt ...
+```
+
+because the source path must be relative to the build context.
+
+---
+
+## Commands Used
+
+```bash
+cd /opt/docker
+
+ls -l
+
+vi Dockerfile
+
+docker build -t httpd-image .
+```
+
+---
+
+## Key Learning
+
+Whenever Docker reports:
+
+```text
+COPY ... not found
+```
+
+the first troubleshooting step should be:
+
+```bash
+ls -R /opt/docker
+```
+
+to inspect the build context and ensure every `COPY` source path matches the actual directory structure.
+
+---
+
+# Linux
+
+# Text Processing with grep and sed
+
+## Objective
+
+Process the file:
+
+```text
+/home/BSD.txt
+```
+
+and generate:
+
+```text
+/home/BSD_DELETE.txt
+
+/home/BSD_REPLACE.txt
+```
+
+---
+
+## Remove Lines Containing "following"
+
+Command:
+
+```bash
+grep -v "following" /home/BSD.txt > /home/BSD_DELETE.txt
+```
+
+Explanation:
+
+* `grep` searches text.
+* `-v` outputs all non-matching lines.
+* Search is case-sensitive.
+
+---
+
+## Replace Only the Word "the"
+
+Requirement:
+
+Replace:
+
+```text
+the
+```
+
+with
+
+```text
+their
+```
+
+without modifying words such as:
+
+```text
+there
+
+theme
+
+other
+```
+
+Used:
+
+```bash
+sed 's/\<the\>/their/g' /home/BSD.txt > /home/BSD_REPLACE.txt
+```
+
+---
+
+## Verification
+
+```bash
+cat /home/BSD_DELETE.txt
+
+cat /home/BSD_REPLACE.txt
+```
+
+---
+
+## Why Word Boundaries Matter
+
+Without word boundaries:
+
+```bash
+sed 's/the/their/g'
+```
+
+Example:
+
+```text
+theme
+```
+
+becomes
+
+```text
+theirme
+```
+
+which is incorrect.
+
+Using:
+
+```bash
+sed 's/\<the\>/their/g'
+```
+
+ensures only the standalone word `the` is replaced.
+
+---
+
+## Commands Used
+
+```bash
+grep -v "following" /home/BSD.txt > /home/BSD_DELETE.txt
+
+sed 's/\<the\>/their/g' /home/BSD.txt > /home/BSD_REPLACE.txt
+
+cat /home/BSD_DELETE.txt
+
+cat /home/BSD_REPLACE.txt
+```
+
+---
+
+## Key Learning
+
+Regular expression word boundaries are essential for accurate text replacement, especially in automation scripts where unintended substitutions can corrupt data.
+
+---
+
+# MLOps
+
+# Production Secret Management with Vault AppRole
+
+## Objective
+
+Understand how production services securely authenticate with Vault using AppRole instead of long-lived root tokens.
+
+---
+
+## Previous Development Pattern
+
+```text
+Application
+
+↓
+
+Root Token
+
+↓
+
+Vault
+
+↓
+
+Read Secret
+```
+
+Problems:
+
+* Long-lived credential
+* High privilege
+* Difficult to rotate
+* Security risk
+
+---
+
+## Production Pattern
+
+```text
+Application
+
+↓
+
+AppRole Login
+
+↓
+
+Vault
+
+↓
+
+Short-lived Token
+
+↓
+
+Read Secret
+
+↓
+
+Start Service
+```
+
+---
+
+## Components
+
+### AppRole
+
+Machine identity used for authentication.
+
+### Role ID
+
+Public identifier (similar to a username).
+
+### Secret ID
+
+Private credential (similar to a password).
+
+### Vault Token
+
+Temporary token issued after successful authentication.
+
+### Policy
+
+Defines exactly what the token can access.
+
+---
+
+## Complete Authentication Flow
+
+```text
+MLflow Wrapper
+        │
+Role ID + Secret ID
+        │
+        ▼
+Vault AppRole Login
+        │
+        ▼
+Temporary Token
+        │
+        ▼
+Policy Evaluation
+        │
+        ▼
+Read secret/data/mlflow
+        │
+        ▼
+Retrieve admin_password
+        │
+        ▼
+MLflow Starts
+```
+
+---
+
+## KV v2 API Path Concept
+
+One important concept learned today:
+
+Writing a secret:
+
+```bash
+vault kv put secret/mlflow ...
+```
+
+internally stores it under:
+
+```text
+secret/data/mlflow
+```
+
+Therefore, Vault policies must reference:
+
+```hcl
+path "secret/data/mlflow"
+```
+
+instead of:
+
+```hcl
+path "secret/mlflow"
+```
+
+This distinction is specific to the KV v2 secrets engine.
+
+---
+
+## Why AppRole Is Used
+
+AppRole enables secure, non-human authentication for services.
+
+Benefits include:
+
+* No hardcoded credentials.
+* Short-lived authentication tokens.
+* Fine-grained permissions through policies.
+* Easy credential rotation.
+* Reduced attack surface.
+
+This is the preferred authentication mechanism for backend services such as MLflow, APIs, CI/CD pipelines, and batch jobs.
+
+---
+
